@@ -20,4 +20,4 @@
 # Go workspace file
 go.work
 
-pages
+data/pages

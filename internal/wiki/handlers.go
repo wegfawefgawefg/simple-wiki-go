@@ -1,11 +1,53 @@
-package main
+package wiki
 
 import (
-	"fmt"
+	"errors"
+	"html/template"
 	"net/http"
 	"os"
+	"path/filepath"
 	"regexp"
 )
+
+const (
+	savedPagesPath = "data/pages"
+	templatesPath  = "web/templates"
+	staticPath     = "web/static"
+)
+
+type Page struct {
+	Title         string
+	InternalTitle string
+	Body          []byte
+}
+
+var funcMap = template.FuncMap{"nl2br": nl2br}
+
+var templates = template.Must(
+	template.New("").Funcs(funcMap).ParseFiles(
+		filepath.Join(templatesPath, "edit.html"),
+		filepath.Join(templatesPath, "view.html"),
+		filepath.Join(templatesPath, "index.html"),
+		filepath.Join(templatesPath, "add_new_page.html"),
+	),
+)
+
+func NewServer() http.Handler {
+	mux := http.NewServeMux()
+
+	fs := http.FileServer(http.Dir(staticPath))
+	mux.Handle("/static/", http.StripPrefix("/static/", fs))
+
+	mux.HandleFunc("/view/", viewHandler)
+	mux.HandleFunc("/edit/", editHandler)
+	mux.HandleFunc("/save/", saveHandler)
+	mux.HandleFunc("/add_new_page", addNewPageHandler)
+	mux.HandleFunc("/internal_add_new_page", internalAddNewPageHandler)
+	mux.HandleFunc("/index", indexHandler)
+	mux.HandleFunc("/", rootHandler)
+
+	return mux
+}
 
 func rootHandler(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/index", http.StatusFound)
@@ -17,38 +59,37 @@ type IndexPageListing struct {
 }
 
 func indexHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("pageIndexHandler start")
-	files, err := os.ReadDir(saved_pages_path)
+	files, err := os.ReadDir(savedPagesPath)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		if errors.Is(err, os.ErrNotExist) {
+			files = nil
+		} else {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 
-	var page_listings []IndexPageListing
+	var pageListings []IndexPageListing
 	for _, file := range files {
-		page_listing := IndexPageListing{
+		pageListing := IndexPageListing{
 			InternalTitle: file.Name(),
 			Title:         internalTitleToTitle(file.Name()),
 		}
-		page_listings = append(page_listings, page_listing)
+		pageListings = append(pageListings, pageListing)
 	}
 
-	template_err := templates.ExecuteTemplate(w,
-		"index.html", page_listings)
-	if template_err != nil {
-		http.Error(w, template_err.Error(), http.StatusInternalServerError)
+	templateErr := templates.ExecuteTemplate(w, "index.html", pageListings)
+	if templateErr != nil {
+		http.Error(w, templateErr.Error(), http.StatusInternalServerError)
 	}
-
-	fmt.Println("pageIndexHandler end")
 }
 
 // as-is renders the add new page template
 func addNewPageHandler(w http.ResponseWriter, r *http.Request) {
-	template_err := templates.ExecuteTemplate(w, "add_new_page.html", nil)
-	if template_err != nil {
-		http.Error(w, template_err.Error(), http.StatusInternalServerError)
+	templateErr := templates.ExecuteTemplate(w, "add_new_page.html", nil)
+	if templateErr != nil {
+		http.Error(w, templateErr.Error(), http.StatusInternalServerError)
 	}
-
 }
 
 // called by the add new page form
@@ -69,7 +110,10 @@ func internalAddNewPageHandler(w http.ResponseWriter, r *http.Request) {
 			"AttemptedTitle": displayTitle,
 		}
 		// Render the form template with the data
-		templates.ExecuteTemplate(w, "add_new_page.html", data)
+		templateErr := templates.ExecuteTemplate(w, "add_new_page.html", data)
+		if templateErr != nil {
+			http.Error(w, templateErr.Error(), http.StatusInternalServerError)
+		}
 		return
 	}
 
@@ -97,38 +141,50 @@ func extractInternalTitleFromPageRequest(r *http.Request) string {
 }
 
 func viewHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("viewHandler start")
 	internalTitle := extractInternalTitleFromPageRequest(r)
-	p, err := loadPage(internalTitle)
-	if err != nil {
-		http.Redirect(w, r, "/edit/"+p.InternalTitle, http.StatusFound)
+	if internalTitle == "" {
+		http.NotFound(w, r)
 		return
 	}
-	template_err := templates.ExecuteTemplate(w, "view.html", p)
-	if template_err != nil {
-		http.Error(w, template_err.Error(), http.StatusInternalServerError)
+
+	p, err := loadPage(internalTitle)
+	if err != nil {
+		http.Redirect(w, r, "/edit/"+internalTitle, http.StatusFound)
+		return
 	}
-	fmt.Println("viewHandler end")
+	templateErr := templates.ExecuteTemplate(w, "view.html", p)
+	if templateErr != nil {
+		http.Error(w, templateErr.Error(), http.StatusInternalServerError)
+	}
 }
 
 func editHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("editHandler start")
-	title := extractInternalTitleFromPageRequest(r)
-	p, err := loadPage(title)
+	internalTitle := extractInternalTitleFromPageRequest(r)
+	if internalTitle == "" {
+		http.NotFound(w, r)
+		return
+	}
+
+	p, err := loadPage(internalTitle)
 	if err != nil {
-		p = &Page{Title: title}
+		p = &Page{
+			Title:         internalTitleToTitle(internalTitle),
+			InternalTitle: internalTitle,
+		}
 	}
-	template_err := templates.ExecuteTemplate(w, "edit.html", p)
-	if template_err != nil {
-		http.Error(w, template_err.Error(), http.StatusInternalServerError)
+	templateErr := templates.ExecuteTemplate(w, "edit.html", p)
+	if templateErr != nil {
+		http.Error(w, templateErr.Error(), http.StatusInternalServerError)
 	}
-	fmt.Println("editHandler end")
 }
 
 func saveHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("saveHandler start")
 	internalTitle := extractInternalTitleFromPageRequest(r)
-	fmt.Println("internalTitle: ", internalTitle)
+	if internalTitle == "" {
+		http.NotFound(w, r)
+		return
+	}
+
 	body := r.FormValue("body")
 
 	p := &Page{
@@ -141,5 +197,4 @@ func saveHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.Redirect(w, r, "/view/"+internalTitle, http.StatusFound)
-	fmt.Println("saveHandler end")
 }

@@ -1,8 +1,8 @@
-package main
+package wiki
 
 import (
-	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -17,18 +17,17 @@ func internalTitleToTitle(filename string) string {
 // Saves a page struct to a file
 // The file is named after the page's title, and the content is the just a dump of the page's body
 func (p *Page) save() error {
-	if _, err := os.Stat(saved_pages_path); os.IsNotExist(err) {
-		os.Mkdir(saved_pages_path, 0755)
+	if err := os.MkdirAll(savedPagesPath, 0o755); err != nil {
+		return err
 	}
-	fullpath := saved_pages_path + "/" + p.InternalTitle
+	fullpath := filepath.Join(savedPagesPath, p.InternalTitle)
 	return os.WriteFile(fullpath, p.Body, 0600)
 }
 
 // Loads a page from a file.
 // The file is named after the page's title, and the body is the file content as a byte array
 func loadPage(internalTitle string) (*Page, error) {
-	fmt.Println("attempt to load page with internalTitle: ", internalTitle)
-	fullpath := saved_pages_path + "/" + internalTitle
+	fullpath := filepath.Join(savedPagesPath, internalTitle)
 	body, err := os.ReadFile(fullpath)
 	if err != nil {
 		return nil, err
