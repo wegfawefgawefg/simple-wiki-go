@@ -1,18 +1,54 @@
+<!doctype html>
+<html lang="en">
 <head>
-    <link rel="stylesheet" type="text/css" href="/static/css/style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wiki Index</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: "IBM Plex Sans", sans-serif;
+        }
+        h1, h2, h3 {
+            font-family: "Fraunces", serif;
+        }
+    </style>
 </head>
+<body class="min-h-screen bg-gradient-to-br from-amber-100 via-orange-50 to-cyan-100 text-slate-900">
+    <main class="mx-auto max-w-4xl px-4 py-10 sm:px-6 lg:px-8">
+        <section class="rounded-3xl border border-amber-200/80 bg-white/80 p-6 shadow-xl shadow-amber-900/10 backdrop-blur sm:p-8">
+            <div class="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">Nofrills Wiki</p>
+                    <h1 class="mt-2 text-4xl font-bold leading-tight text-slate-900 sm:text-5xl">Page Index</h1>
+                    <p class="mt-3 max-w-xl text-sm text-slate-600 sm:text-base">Browse existing pages or create a new one.</p>
+                </div>
+                <a href="/add_new_page" class="inline-flex items-center justify-center rounded-xl bg-amber-500 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-amber-700/30 transition hover:-translate-y-0.5 hover:bg-amber-600">
+                    + Add New Page
+                </a>
+            </div>
+        </section>
 
-<h1>Page Index</h1>
-
-
-<a href="/add_new_page">Add a new page</a>
-
-
-<h3>Existing Pages:</h3>
-<ul>
-    {{range .}}
-    <li>
-        <a href="/view/{{.InternalTitle}}">{{.Title}}</a>
-    </li>
-    {{end}}
-</ul>
+        <section class="mt-8 rounded-3xl border border-cyan-200/70 bg-white/85 p-6 shadow-xl shadow-cyan-900/10 backdrop-blur sm:p-8">
+            <h2 class="text-2xl font-semibold text-slate-900">Existing Pages</h2>
+            <ul class="mt-5 space-y-3">
+                {{range .}}
+                <li>
+                    <a href="/view/{{.InternalTitle}}" class="group flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3 transition hover:border-cyan-300 hover:bg-cyan-50">
+                        <span class="font-medium text-slate-800">{{.Title}}</span>
+                        <span class="text-slate-400 transition group-hover:translate-x-0.5 group-hover:text-cyan-700">view -></span>
+                    </a>
+                </li>
+                {{else}}
+                <li class="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-slate-600">
+                    No pages yet. Create the first page to get started.
+                </li>
+                {{end}}
+            </ul>
+        </section>
+    </main>
+</body>
+</html>
