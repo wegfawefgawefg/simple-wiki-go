@@ -4,6 +4,10 @@ its a simple wiki written in go for my education
 ## resources
 https://go.dev/doc/articles/wiki/
 
+## screenshots
+![Wiki screenshot 1](assets/image.png)
+![Wiki screenshot 2](assets/image2.png)
+
 ## project layout
 Standardized Go app layout:
 
